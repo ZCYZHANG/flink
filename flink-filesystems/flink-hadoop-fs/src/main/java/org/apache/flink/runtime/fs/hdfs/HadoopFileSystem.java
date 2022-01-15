@@ -169,12 +169,10 @@ public class HadoopFileSystem extends FileSystem {
     public FileStatus[] listStatus(final Path f) throws IOException {
         final org.apache.hadoop.fs.FileStatus[] hadoopFiles = this.fs.listStatus(toHadoopPath(f));
         final FileStatus[] files = new FileStatus[hadoopFiles.length];
-
         // Convert types
         for (int i = 0; i < files.length; i++) {
             files[i] = HadoopFileStatus.fromHadoopStatus(hadoopFiles[i]);
         }
-
         return files;
     }
 
@@ -235,7 +233,6 @@ public class HadoopFileSystem extends FileSystem {
      */
     static FileSystemKind getKindForScheme(String scheme) {
         scheme = scheme.toLowerCase(Locale.US);
-
         if (scheme.startsWith("s3")
                 || scheme.startsWith("emr")
                 || scheme.startsWith("oss")
