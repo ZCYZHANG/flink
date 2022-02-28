@@ -21,6 +21,7 @@ package org.apache.flink.runtime.checkpoint;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -268,6 +269,7 @@ public class CheckpointCoordinatorTest extends TestLogger {
         CheckpointMetrics lateReportedMetrics =
                 new CheckpointMetricsBuilder()
                         .setTotalBytesPersisted(18)
+                        .setBytesPersistedOfThisCheckpoint(18)
                         .setBytesProcessedDuringAlignment(19)
                         .setAsyncDurationMillis(20)
                         .setAlignmentDurationNanos(123 * 1_000_000)
@@ -1996,7 +1998,7 @@ public class CheckpointCoordinatorTest extends TestLogger {
         // trigger the first checkpoint. this should succeed
         String savepointDir = tmpFolder.newFolder().getAbsolutePath();
         CompletableFuture<CompletedCheckpoint> savepointFuture =
-                checkpointCoordinator.triggerSavepoint(savepointDir);
+                checkpointCoordinator.triggerSavepoint(savepointDir, SavepointFormatType.CANONICAL);
         manuallyTriggeredScheduledExecutor.triggerAll();
         assertFalse(savepointFuture.isDone());
 
@@ -2128,7 +2130,7 @@ public class CheckpointCoordinatorTest extends TestLogger {
 
         // Trigger savepoint and checkpoint
         CompletableFuture<CompletedCheckpoint> savepointFuture1 =
-                checkpointCoordinator.triggerSavepoint(savepointDir);
+                checkpointCoordinator.triggerSavepoint(savepointDir, SavepointFormatType.CANONICAL);
 
         manuallyTriggeredScheduledExecutor.triggerAll();
         long savepointId1 = counter.getLast();
@@ -2172,7 +2174,7 @@ public class CheckpointCoordinatorTest extends TestLogger {
         assertEquals(2, checkpointCoordinator.getNumberOfPendingCheckpoints());
 
         CompletableFuture<CompletedCheckpoint> savepointFuture2 =
-                checkpointCoordinator.triggerSavepoint(savepointDir);
+                checkpointCoordinator.triggerSavepoint(savepointDir, SavepointFormatType.CANONICAL);
         manuallyTriggeredScheduledExecutor.triggerAll();
         long savepointId2 = counter.getLast();
         FutureUtils.throwIfCompletedExceptionally(savepointFuture2);
@@ -2465,7 +2467,9 @@ public class CheckpointCoordinatorTest extends TestLogger {
 
         // Trigger savepoints
         for (int i = 0; i < numSavepoints; i++) {
-            savepointFutures.add(checkpointCoordinator.triggerSavepoint(savepointDir));
+            savepointFutures.add(
+                    checkpointCoordinator.triggerSavepoint(
+                            savepointDir, SavepointFormatType.CANONICAL));
         }
 
         // After triggering multiple savepoints, all should in progress
@@ -2508,11 +2512,11 @@ public class CheckpointCoordinatorTest extends TestLogger {
         String savepointDir = tmpFolder.newFolder().getAbsolutePath();
 
         CompletableFuture<CompletedCheckpoint> savepoint0 =
-                checkpointCoordinator.triggerSavepoint(savepointDir);
+                checkpointCoordinator.triggerSavepoint(savepointDir, SavepointFormatType.CANONICAL);
         assertFalse("Did not trigger savepoint", savepoint0.isDone());
 
         CompletableFuture<CompletedCheckpoint> savepoint1 =
-                checkpointCoordinator.triggerSavepoint(savepointDir);
+                checkpointCoordinator.triggerSavepoint(savepointDir, SavepointFormatType.CANONICAL);
         assertFalse("Did not trigger savepoint", savepoint1.isDone());
     }
 
@@ -3031,7 +3035,8 @@ public class CheckpointCoordinatorTest extends TestLogger {
                                 }));
 
         final CompletableFuture<CompletedCheckpoint> savepointFuture =
-                coordinator.triggerSynchronousSavepoint(false, "test-dir");
+                coordinator.triggerSynchronousSavepoint(
+                        false, "test-dir", SavepointFormatType.CANONICAL);
 
         manuallyTriggeredScheduledExecutor.triggerAll();
         final PendingCheckpoint syncSavepoint =
@@ -3137,7 +3142,8 @@ public class CheckpointCoordinatorTest extends TestLogger {
             assertEquals(
                     activeRequests - maxConcurrentCheckpoints, coordinator.getNumQueuedRequests());
 
-            Future<?> savepointFuture = coordinator.triggerSavepoint("/tmp");
+            Future<?> savepointFuture =
+                    coordinator.triggerSavepoint("/tmp", SavepointFormatType.CANONICAL);
             manuallyTriggeredScheduledExecutor.triggerAll();
             assertEquals(
                     ++activeRequests - maxConcurrentCheckpoints,
@@ -3763,7 +3769,7 @@ public class CheckpointCoordinatorTest extends TestLogger {
             if (cpSequenceNumber > 0) {
                 sharedState.put(
                         new StateHandleID("shared-" + (cpSequenceNumber - 1)),
-                        spy(new PlaceholderStreamStateHandle()));
+                        spy(new PlaceholderStreamStateHandle(1L)));
             }
 
             sharedState.put(

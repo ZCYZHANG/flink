@@ -3,8 +3,8 @@ title: "Checkpointing under backpressure"
 weight: 9
 type: docs
 aliases:
-- /ops/state/unalgined_checkpoints.html
-- /ops/state/checkpointing_under_backpressure.html
+- /zh/ops/state/unalgined_checkpoints.html
+- /zh/ops/state/checkpointing_under_backpressure.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -128,6 +128,21 @@ Checkpoint。此外，Savepoint 也不能与非对齐 Checkpoint 同时发生，
 In-flight 数据后再生成 Watermark **。如果您的 Pipeline 中使用了**对每条记录都应用最新的 Watermark 的算子**将会相对于
 使用对齐 Checkpoint产生**不同的结果**。如果您的 Operator 依赖于最新的 Watermark 始终可用，解决办法是将 Watermark 
 存放在 OperatorState 中。在这种情况下，Watermark 应该使用单键 group 存放在 UnionState 以方便扩缩容。
+
+#### Interplay with long-running record processing
+
+Despite that unaligned checkpoints barriers are able to overtake all other records in the queue.
+The handling of this barrier still can be delayed if the current record takes a lot of time to be processed.
+This situation can occur when firing many timers all at once, for example in windowed operations.
+Second problematic scenario might occur when system is being blocked waiting for more than one
+network buffer availability when processing a single input record. Flink can not interrupt processing of
+a single input record, and unaligned checkpoints have to wait for the currently processed record to be
+fully processed. This can cause problems in two scenarios. Either as a result of serialisation of a large
+record that doesn't fit into single network buffer or in a flatMap operation, that produces many output
+records for one input record. In such scenarios back pressure can block unaligned checkpoints until all
+the network buffers required to process the single input record are available.
+It also can happen in any other situation when the processing of the single record takes a while.
+As result, the time of the checkpoint can be higher than expected or it can vary.
 
 #### Certain data distribution patterns are not checkpointed
 

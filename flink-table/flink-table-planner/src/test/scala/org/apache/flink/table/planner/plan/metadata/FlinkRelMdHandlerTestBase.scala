@@ -799,8 +799,7 @@ class FlinkRelMdHandlerTestBase {
       streamPhysicalTraits,
       streamExchange,
       key,
-      table.tableIdentifier,
-      table.catalogTable)
+      table.contextResolvedTable)
   }
 
   protected lazy val streamDropUpdateBefore = {
@@ -979,7 +978,7 @@ class FlinkRelMdHandlerTestBase {
       cluster, streamPhysicalTraits, streamTs, program, program.getOutputRowType)
     val streamExchange = new StreamPhysicalExchange(
       cluster, streamPhysicalTraits.replace(hash01), streamCalc, hash01)
-    val emitStrategy = WindowEmitStrategy(tableConfig, tumblingGroupWindow)
+    val emitStrategy = WindowEmitStrategy(tableConfig.getConfiguration, tumblingGroupWindow)
     val streamWindowAgg = new StreamPhysicalGroupWindowTableAggregate(
       cluster,
       streamPhysicalTraits,
@@ -1621,7 +1620,7 @@ class FlinkRelMdHandlerTestBase {
       cluster, streamPhysicalTraits, streamTs, program, program.getOutputRowType)
     val streamExchange = new StreamPhysicalExchange(
       cluster, streamPhysicalTraits.replace(hash01), streamCalc, hash01)
-    val emitStrategy = WindowEmitStrategy(tableConfig, tumblingGroupWindow)
+    val emitStrategy = WindowEmitStrategy(tableConfig.getConfiguration, tumblingGroupWindow)
     val streamWindowAgg = new StreamPhysicalGroupWindowAggregate(
       cluster,
       streamPhysicalTraits,
@@ -1760,7 +1759,7 @@ class FlinkRelMdHandlerTestBase {
       cluster, streamPhysicalTraits, streamTs, program, program.getOutputRowType)
     val streamExchange = new StreamPhysicalExchange(
       cluster, streamPhysicalTraits.replace(hash1), streamCalc, hash1)
-    val emitStrategy = WindowEmitStrategy(tableConfig, tumblingGroupWindow)
+    val emitStrategy = WindowEmitStrategy(tableConfig.getConfiguration, tumblingGroupWindow)
     val streamWindowAgg = new StreamPhysicalGroupWindowAggregate(
       cluster,
       streamPhysicalTraits,

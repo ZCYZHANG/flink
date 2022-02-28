@@ -51,6 +51,7 @@ import java.util.Set;
 import static org.apache.flink.table.functions.FunctionKind.AGGREGATE;
 import static org.apache.flink.table.functions.FunctionKind.OTHER;
 import static org.apache.flink.table.functions.FunctionKind.SCALAR;
+import static org.apache.flink.table.functions.FunctionKind.TABLE;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.ANY;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.COMMON_ARG_NULLABLE;
 import static org.apache.flink.table.types.inference.InputTypeStrategies.LITERAL;
@@ -138,6 +139,26 @@ public final class BuiltInFunctionDefinitions {
                     .outputTypeStrategy(nullableIfAllArgs(COMMON))
                     .runtimeClass(
                             "org.apache.flink.table.runtime.functions.scalar.CoalesceFunction")
+                    .build();
+
+    public static final BuiltInFunctionDefinition INTERNAL_REPLICATE_ROWS =
+            BuiltInFunctionDefinition.newBuilder()
+                    .name("$REPLICATE_ROWS$1")
+                    .kind(TABLE)
+                    .outputTypeStrategy(SpecificTypeStrategies.INTERNAL_REPLICATE_ROWS)
+                    .runtimeClass(
+                            "org.apache.flink.table.runtime.functions.table.ReplicateRowsFunction")
+                    .internal()
+                    .build();
+
+    public static final BuiltInFunctionDefinition INTERNAL_UNNEST_ROWS =
+            BuiltInFunctionDefinition.newBuilder()
+                    .name("$UNNEST_ROWS$1")
+                    .kind(TABLE)
+                    .outputTypeStrategy(TypeStrategies.MISSING)
+                    .runtimeClass(
+                            "org.apache.flink.table.runtime.functions.table.UnnestRowsFunction")
+                    .internal()
                     .build();
 
     // --------------------------------------------------------------------------------------------
@@ -1695,6 +1716,14 @@ public final class BuiltInFunctionDefinitions {
                     .inputTypeStrategy(SpecificInputTypeStrategies.CAST)
                     .outputTypeStrategy(
                             nullableIfArgs(ConstantArgumentCount.to(0), TypeStrategies.argument(1)))
+                    .build();
+
+    public static final BuiltInFunctionDefinition TRY_CAST =
+            BuiltInFunctionDefinition.newBuilder()
+                    .name("tryCast")
+                    .kind(SCALAR)
+                    .inputTypeStrategy(SpecificInputTypeStrategies.CAST)
+                    .outputTypeStrategy(forceNullable(TypeStrategies.argument(1)))
                     .build();
 
     public static final BuiltInFunctionDefinition REINTERPRET_CAST =

@@ -19,6 +19,7 @@ limitations under the License.
 package org.apache.flink.runtime.source.coordinator;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.eventtime.WatermarkAlignmentParams;
 import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.api.connector.source.SourceSplit;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -30,8 +31,6 @@ import org.apache.flink.util.FatalExitExceptionHandler;
 import javax.annotation.Nullable;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.BiConsumer;
 
@@ -42,6 +41,7 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
     private final String operatorName;
     private final Source<?, SplitT, ?> source;
     private final int numWorkerThreads;
+    private final WatermarkAlignmentParams alignmentParams;
 
     /**
      * Construct the {@link SourceCoordinatorProvider}.
@@ -58,11 +58,13 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
             String operatorName,
             OperatorID operatorID,
             Source<?, SplitT, ?> source,
-            int numWorkerThreads) {
+            int numWorkerThreads,
+            WatermarkAlignmentParams alignmentParams) {
         super(operatorID);
         this.operatorName = operatorName;
         this.source = source;
         this.numWorkerThreads = numWorkerThreads;
+        this.alignmentParams = alignmentParams;
     }
 
     @Override
@@ -71,19 +73,17 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
         CoordinatorExecutorThreadFactory coordinatorThreadFactory =
                 new CoordinatorExecutorThreadFactory(
                         coordinatorThreadName, context.getUserCodeClassloader());
-        ExecutorService coordinatorExecutor =
-                Executors.newSingleThreadExecutor(coordinatorThreadFactory);
 
         SimpleVersionedSerializer<SplitT> splitSerializer = source.getSplitSerializer();
         SourceCoordinatorContext<SplitT> sourceCoordinatorContext =
                 new SourceCoordinatorContext<>(
-                        coordinatorExecutor,
-                        coordinatorThreadFactory,
-                        numWorkerThreads,
-                        context,
-                        splitSerializer);
+                        coordinatorThreadFactory, numWorkerThreads, context, splitSerializer);
         return new SourceCoordinator<>(
-                operatorName, coordinatorExecutor, source, sourceCoordinatorContext);
+                operatorName,
+                source,
+                sourceCoordinatorContext,
+                context.getCoordinatorStore(),
+                alignmentParams);
     }
 
     /** A thread factory class that provides some helper methods. */
@@ -95,8 +95,6 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
         private final Thread.UncaughtExceptionHandler errorHandler;
 
         @Nullable private Thread t;
-
-        @Nullable private volatile Throwable previousFailureReason;
 
         CoordinatorExecutorThreadFactory(
                 final String coordinatorThreadName, final ClassLoader contextClassLoader) {
@@ -115,18 +113,6 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
 
         @Override
         public synchronized Thread newThread(Runnable r) {
-            if (t != null && t.isAlive()) {
-                throw new Error(
-                        "Source Coordinator Thread already exists. There should never be more than one "
-                                + "thread driving the actions of a Source Coordinator. Existing Thread: "
-                                + t);
-            }
-            if (t != null && previousFailureReason != null) {
-                throw new Error(
-                        "The following fatal error has happened in a previously spawned "
-                                + "Source Coordinator thread. No new thread can be spawned.",
-                        previousFailureReason);
-            }
             t = new Thread(r, coordinatorThreadName);
             t.setContextClassLoader(cl);
             t.setUncaughtExceptionHandler(this);
@@ -135,9 +121,6 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
 
         @Override
         public synchronized void uncaughtException(Thread t, Throwable e) {
-            if (previousFailureReason == null) {
-                previousFailureReason = e;
-            }
             errorHandler.uncaughtException(t, e);
         }
 

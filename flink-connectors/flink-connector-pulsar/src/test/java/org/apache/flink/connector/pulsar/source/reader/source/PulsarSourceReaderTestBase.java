@@ -32,8 +32,8 @@ import org.apache.flink.connector.pulsar.testutils.extension.TestOrderlinessExte
 import org.apache.flink.connector.pulsar.testutils.runtime.PulsarRuntimeOperator;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderOutput;
-import org.apache.flink.connectors.test.common.junit.extensions.TestLoggerExtension;
 import org.apache.flink.core.io.InputStatus;
+import org.apache.flink.util.TestLoggerExtension;
 
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.api.MessageId;
@@ -74,6 +74,7 @@ import static org.apache.flink.connector.pulsar.testutils.extension.TestOrderlin
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith({
     TestOrderlinessExtension.class,
@@ -93,7 +94,7 @@ abstract class PulsarSourceReaderTestBase extends PulsarTestSuiteBase {
 
     @AfterEach
     void afterEach(String topicName) {
-        operator().deleteTopic(topicName, true);
+        operator().deleteTopic(topicName);
     }
 
     @TestTemplate
@@ -146,7 +147,8 @@ abstract class PulsarSourceReaderTestBase extends PulsarTestSuiteBase {
         SourceReaderContext context = new TestingReaderContext();
         try {
             deserializationSchema.open(
-                    new PulsarDeserializationSchemaInitializationContext(context));
+                    new PulsarDeserializationSchemaInitializationContext(context),
+                    mock(SourceConfiguration.class));
         } catch (Exception e) {
             fail("Error while opening deserializationSchema");
         }
@@ -154,7 +156,7 @@ abstract class PulsarSourceReaderTestBase extends PulsarTestSuiteBase {
         SourceConfiguration sourceConfiguration = new SourceConfiguration(configuration);
         return (PulsarSourceReaderBase<Integer>)
                 PulsarSourceReaderFactory.create(
-                        context, deserializationSchema, configuration, sourceConfiguration);
+                        context, deserializationSchema, sourceConfiguration);
     }
 
     public class PulsarSourceReaderInvocationContextProvider

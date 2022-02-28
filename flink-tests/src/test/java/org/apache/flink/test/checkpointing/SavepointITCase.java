@@ -42,11 +42,13 @@ import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.configuration.StateBackendOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.contrib.streaming.state.EmbeddedRocksDBStateBackend;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FSDataOutputStream;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.FileSystemFactory;
 import org.apache.flink.core.fs.local.LocalFileSystem;
+import org.apache.flink.core.fs.local.LocalRecoverableWriter;
 import org.apache.flink.core.testutils.OneShotLatch;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
 import org.apache.flink.runtime.client.JobExecutionException;
@@ -215,7 +217,7 @@ public class SavepointITCase extends TestLogger {
             BoundedPassThroughOperator.getProgressLatch().await();
             waitForAllTaskRunning(cluster.getMiniCluster(), jobId, false);
 
-            client.stopWithSavepoint(jobId, drain, null).get();
+            client.stopWithSavepoint(jobId, drain, null, SavepointFormatType.CANONICAL).get();
 
             if (drain) {
                 Assert.assertTrue(BoundedPassThroughOperator.inputEnded);
@@ -253,7 +255,11 @@ public class SavepointITCase extends TestLogger {
             client.submitJob(jobGraph).get();
             waitUntilAllTasksAreRunning(cluster.getRestClusterClient(), jobGraph.getJobID());
 
-            client.stopWithSavepoint(jobGraph.getJobID(), true, savepointDir.getAbsolutePath())
+            client.stopWithSavepoint(
+                            jobGraph.getJobID(),
+                            true,
+                            savepointDir.getAbsolutePath(),
+                            SavepointFormatType.CANONICAL)
                     .get();
             // there should be no exceptions and the finish should've been called in the
             // FinishingSink
@@ -542,7 +548,7 @@ public class SavepointITCase extends TestLogger {
             waitForAllTaskRunning(cluster.getMiniCluster(), jobId, false);
             StatefulCounter.getProgressLatch().await();
 
-            return client.cancelWithSavepoint(jobId, null).get();
+            return client.cancelWithSavepoint(jobId, null, SavepointFormatType.CANONICAL).get();
         } finally {
             cluster.after();
             StatefulCounter.resetForTest(parallelism);
@@ -653,7 +659,7 @@ public class SavepointITCase extends TestLogger {
         final JobID jobID = new JobID();
 
         try {
-            client.triggerSavepoint(jobID, null).get();
+            client.triggerSavepoint(jobID, null, SavepointFormatType.CANONICAL).get();
 
             fail();
         } catch (ExecutionException e) {
@@ -693,7 +699,7 @@ public class SavepointITCase extends TestLogger {
             // triggerSavepoint is only available after all tasks are running
             waitForAllTaskRunning(cluster.getMiniCluster(), graph.getJobID(), false);
 
-            client.triggerSavepoint(graph.getJobID(), null).get();
+            client.triggerSavepoint(graph.getJobID(), null, SavepointFormatType.CANONICAL).get();
 
             fail();
         } catch (ExecutionException e) {
@@ -734,7 +740,10 @@ public class SavepointITCase extends TestLogger {
 
             waitForAllTaskRunning(cluster.getMiniCluster(), jobGraph.getJobID(), false);
 
-            savepointPath = client.triggerSavepoint(jobGraph.getJobID(), null).get();
+            savepointPath =
+                    client.triggerSavepoint(
+                                    jobGraph.getJobID(), null, SavepointFormatType.CANONICAL)
+                            .get();
 
             assertNotNull(savepointPath);
 
@@ -843,7 +852,7 @@ public class SavepointITCase extends TestLogger {
                 BoundedPassThroughOperator.getProgressLatch().await();
                 waitForAllTaskRunning(cluster.getMiniCluster(), jobId, false);
 
-                client.stopWithSavepoint(jobId, false, null).get();
+                client.stopWithSavepoint(jobId, false, null, SavepointFormatType.CANONICAL).get();
 
                 Assert.assertFalse(
                         "input ended with chainingStrategy " + chainingStrategy,
@@ -964,7 +973,8 @@ public class SavepointITCase extends TestLogger {
                                 true,
                                 PathFailingFileSystem.SCHEME
                                         + "://"
-                                        + savepointDir.getAbsolutePath())
+                                        + savepointDir.getAbsolutePath(),
+                                SavepointFormatType.CANONICAL)
                         .get();
                 fail("The future should fail exceptionally.");
             } catch (ExecutionException ex) {
@@ -1086,7 +1096,11 @@ public class SavepointITCase extends TestLogger {
             waitForAllTaskRunning(cluster.getMiniCluster(), jobID, false);
 
             try {
-                client.stopWithSavepoint(jobGraph.getJobID(), false, savepointDir.getAbsolutePath())
+                client.stopWithSavepoint(
+                                jobGraph.getJobID(),
+                                false,
+                                savepointDir.getAbsolutePath(),
+                                SavepointFormatType.CANONICAL)
                         .get();
                 fail("The future should fail exceptionally.");
             } catch (ExecutionException e) {
@@ -1195,7 +1209,8 @@ public class SavepointITCase extends TestLogger {
                     StatefulCounter.getProgressLatch()
                             .await(deadline.timeLeft().toMillis(), TimeUnit.MILLISECONDS));
 
-            savepointPath = client.triggerSavepoint(jobID, null).get();
+            savepointPath =
+                    client.triggerSavepoint(jobID, null, SavepointFormatType.CANONICAL).get();
             LOG.info("Retrieved savepoint: " + savepointPath + ".");
         } finally {
             // Shut down the Flink cluster (thereby canceling the job)
@@ -1537,7 +1552,10 @@ public class SavepointITCase extends TestLogger {
             for (OneShotLatch latch : iterTestSnapshotWait) {
                 latch.await();
             }
-            savepointPath = client.triggerSavepoint(jobGraph.getJobID(), null).get();
+            savepointPath =
+                    client.triggerSavepoint(
+                                    jobGraph.getJobID(), null, SavepointFormatType.CANONICAL)
+                            .get();
 
             client.cancel(jobGraph.getJobID()).get();
             while (!client.getJobStatus(jobGraph.getJobID()).get().isGloballyTerminalState()) {
@@ -1771,6 +1789,12 @@ public class SavepointITCase extends TestLogger {
                 throws IOException {
             failPath(filePath);
             return super.create(filePath, overwrite);
+        }
+
+        @Override
+        public LocalRecoverableWriter createRecoverableWriter() throws IOException {
+            throw new UnsupportedOperationException(
+                    "This file system does not support recoverable writers.");
         }
 
         private void failPath(org.apache.flink.core.fs.Path filePath) throws IOException {

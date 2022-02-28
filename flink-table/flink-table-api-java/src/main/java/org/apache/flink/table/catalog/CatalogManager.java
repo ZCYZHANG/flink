@@ -345,70 +345,35 @@ public final class CatalogManager {
     }
 
     /**
-     * Result of a lookup for a table through {@link #getTable(ObjectIdentifier)}. It combines the
-     * {@link CatalogBaseTable} with additional information such as if the table is a temporary
-     * table or comes from the catalog.
-     */
-    @Internal
-    public static class TableLookupResult {
-
-        private final @Nullable Catalog catalog;
-        private final ResolvedCatalogBaseTable<?> resolvedTable;
-
-        public static TableLookupResult temporary(ResolvedCatalogBaseTable<?> resolvedTable) {
-            return new TableLookupResult(null, resolvedTable);
-        }
-
-        public static TableLookupResult permanent(
-                Catalog catalog, ResolvedCatalogBaseTable<?> resolvedTable) {
-            return new TableLookupResult(Preconditions.checkNotNull(catalog), resolvedTable);
-        }
-
-        private TableLookupResult(
-                @Nullable Catalog catalog, ResolvedCatalogBaseTable<?> resolvedTable) {
-            this.catalog = catalog;
-            this.resolvedTable = resolvedTable;
-        }
-
-        public boolean isTemporary() {
-            return catalog == null;
-        }
-
-        public Optional<Catalog> getCatalog() {
-            return Optional.ofNullable(catalog);
-        }
-
-        /** Returns a fully resolved catalog object. */
-        public ResolvedCatalogBaseTable<?> getResolvedTable() {
-            return resolvedTable;
-        }
-
-        public ResolvedSchema getResolvedSchema() {
-            return resolvedTable.getResolvedSchema();
-        }
-
-        /** Returns the original metadata object returned by the catalog. */
-        public CatalogBaseTable getTable() {
-            return resolvedTable.getOrigin();
-        }
-    }
-
-    /**
      * Retrieves a fully qualified table. If the path is not yet fully qualified use {@link
      * #qualifyIdentifier(UnresolvedIdentifier)} first.
      *
      * @param objectIdentifier full path of the table to retrieve
      * @return table that the path points to.
      */
-    public Optional<TableLookupResult> getTable(ObjectIdentifier objectIdentifier) {
+    public Optional<ContextResolvedTable> getTable(ObjectIdentifier objectIdentifier) {
         CatalogBaseTable temporaryTable = temporaryTables.get(objectIdentifier);
         if (temporaryTable != null) {
             final ResolvedCatalogBaseTable<?> resolvedTable =
                     resolveCatalogBaseTable(temporaryTable);
-            return Optional.of(TableLookupResult.temporary(resolvedTable));
+            return Optional.of(ContextResolvedTable.temporary(objectIdentifier, resolvedTable));
         } else {
             return getPermanentTable(objectIdentifier);
         }
+    }
+
+    /**
+     * Like {@link #getTable(ObjectIdentifier)}, but throws an error when the table is not available
+     * in any of the catalogs.
+     */
+    public ContextResolvedTable getTableOrError(ObjectIdentifier objectIdentifier) {
+        return getTable(objectIdentifier)
+                .orElseThrow(
+                        () ->
+                                new TableException(
+                                        String.format(
+                                                "Cannot find table '%s' in any of the catalogs %s, nor as a temporary table.",
+                                                objectIdentifier, listCatalogs())));
     }
 
     /**
@@ -432,14 +397,16 @@ public final class CatalogManager {
         return Optional.empty();
     }
 
-    private Optional<TableLookupResult> getPermanentTable(ObjectIdentifier objectIdentifier) {
+    private Optional<ContextResolvedTable> getPermanentTable(ObjectIdentifier objectIdentifier) {
         Catalog currentCatalog = catalogs.get(objectIdentifier.getCatalogName());
         ObjectPath objectPath = objectIdentifier.toObjectPath();
         if (currentCatalog != null) {
             try {
                 final CatalogBaseTable table = currentCatalog.getTable(objectPath);
                 final ResolvedCatalogBaseTable<?> resolvedTable = resolveCatalogBaseTable(table);
-                return Optional.of(TableLookupResult.permanent(currentCatalog, resolvedTable));
+                return Optional.of(
+                        ContextResolvedTable.permanent(
+                                objectIdentifier, currentCatalog, resolvedTable));
             } catch (TableNotExistException e) {
                 // Ignore.
             }
@@ -740,6 +707,26 @@ public final class CatalogManager {
     }
 
     /**
+     * Resolve dynamic options for compact operation on a Flink's managed table.
+     *
+     * @param origin The resolved managed table with enriched options.
+     * @param tableIdentifier The fully qualified path of the managed table.
+     * @param partitionSpec User-specified unresolved partition spec.
+     * @return dynamic options which describe the metadata of compaction
+     */
+    public Map<String, String> resolveCompactManagedTableOptions(
+            ResolvedCatalogTable origin,
+            ObjectIdentifier tableIdentifier,
+            CatalogPartitionSpec partitionSpec) {
+        return managedTableListener.notifyTableCompaction(
+                catalogs.getOrDefault(tableIdentifier.getCatalogName(), null),
+                tableIdentifier,
+                origin,
+                partitionSpec,
+                false);
+    }
+
+    /**
      * Drop a temporary table in a given fully qualified path.
      *
      * @param objectIdentifier The fully qualified path of the table to drop.
@@ -912,7 +899,7 @@ public final class CatalogManager {
 
     /** Resolves a {@link CatalogBaseTable} to a validated {@link ResolvedCatalogBaseTable}. */
     public ResolvedCatalogBaseTable<?> resolveCatalogBaseTable(CatalogBaseTable baseTable) {
-        Preconditions.checkState(schemaResolver != null, "Schema resolver is not initialized.");
+        Preconditions.checkNotNull(schemaResolver, "Schema resolver is not initialized.");
         if (baseTable instanceof CatalogTable) {
             return resolveCatalogTable((CatalogTable) baseTable);
         } else if (baseTable instanceof CatalogView) {
@@ -924,13 +911,14 @@ public final class CatalogManager {
 
     /** Resolves a {@link CatalogTable} to a validated {@link ResolvedCatalogTable}. */
     public ResolvedCatalogTable resolveCatalogTable(CatalogTable table) {
-        Preconditions.checkState(schemaResolver != null, "Schema resolver is not initialized.");
+        Preconditions.checkNotNull(schemaResolver, "Schema resolver is not initialized.");
         if (table instanceof ResolvedCatalogTable) {
             return (ResolvedCatalogTable) table;
         }
 
         final ResolvedSchema resolvedSchema = table.getUnresolvedSchema().resolve(schemaResolver);
 
+        // Validate partition keys are included in physical columns
         final List<String> physicalColumns =
                 resolvedSchema.getColumns().stream()
                         .filter(Column::isPhysical)
@@ -954,7 +942,7 @@ public final class CatalogManager {
 
     /** Resolves a {@link CatalogView} to a validated {@link ResolvedCatalogView}. */
     public ResolvedCatalogView resolveCatalogView(CatalogView view) {
-        Preconditions.checkState(schemaResolver != null, "Schema resolver is not initialized.");
+        Preconditions.checkNotNull(schemaResolver, "Schema resolver is not initialized.");
         if (view instanceof ResolvedCatalogView) {
             return (ResolvedCatalogView) view;
         }

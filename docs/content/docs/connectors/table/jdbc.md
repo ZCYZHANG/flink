@@ -40,6 +40,9 @@ Dependencies
 
 {{< sql_download_table "jdbc" >}}
 
+The JDBC connector is not part of the binary distribution.
+See how to link with it for cluster execution [here]({{< ref "docs/dev/configuration/overview" >}}).
+
 A driver dependency is also required to connect to a specified database. Here are drivers currently supported:
 
 | Driver      |      Group Id      |      Artifact Id       |      JAR         |
@@ -50,7 +53,7 @@ A driver dependency is also required to connect to a specified database. Here ar
 | Derby       | `org.apache.derby` |        `derby`         | [Download](http://db.apache.org/derby/derby_downloads.html) |
 
 
-JDBC connector and drivers are not currently part of Flink's binary distribution. See how to link with them for cluster execution [here]({{< ref "docs/dev/datastream/project-configuration" >}}).
+JDBC connector and drivers are not part of Flink's binary distribution. See how to link with them for cluster execution [here]({{< ref "docs/dev/configuration" >}}).
 
 
 How to create a JDBC table
@@ -93,15 +96,17 @@ Connector Options
       <tr>
         <th class="text-left" style="width: 25%">Option</th>
         <th class="text-left" style="width: 8%">Required</th>
+        <th class="text-left" style="width: 8%">Forwarded</th>
         <th class="text-left" style="width: 7%">Default</th>
         <th class="text-left" style="width: 10%">Type</th>
-        <th class="text-left" style="width: 50%">Description</th>
+        <th class="text-left" style="width: 42%">Description</th>
       </tr>
     </thead>
     <tbody>
     <tr>
       <td><h5>connector</h5></td>
       <td>required</td>
+      <td>no</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Specify what connector to use, here should be <code>'jdbc'</code>.</td>
@@ -109,6 +114,7 @@ Connector Options
     <tr>
       <td><h5>url</h5></td>
       <td>required</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The JDBC database url.</td>
@@ -116,6 +122,7 @@ Connector Options
     <tr>
       <td><h5>table-name</h5></td>
       <td>required</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The name of JDBC table to connect.</td>
@@ -123,6 +130,7 @@ Connector Options
     <tr>
       <td><h5>driver</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The class name of the JDBC driver to use to connect to this URL, if not set, it will automatically be derived from the URL.</td>
@@ -130,6 +138,7 @@ Connector Options
     <tr>
       <td><h5>username</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The JDBC user name. <code>'username'</code> and <code>'password'</code> must both be specified if any of them is specified.</td>
@@ -137,6 +146,7 @@ Connector Options
     <tr>
       <td><h5>password</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The JDBC password.</td>
@@ -144,6 +154,7 @@ Connector Options
     <tr>
       <td><h5>connection.max-retry-timeout</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">60s</td>
       <td>Duration</td>
       <td>Maximum timeout between retries. The timeout should be in second granularity and shouldn't be smaller than 1 second.</td>
@@ -151,6 +162,7 @@ Connector Options
     <tr>
       <td><h5>scan.partition.column</h5></td>
       <td>optional</td>
+      <td>no</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The column name used for partitioning the input. See the following <a href="#partitioned-scan">Partitioned Scan</a> section for more details.</td>
@@ -158,6 +170,7 @@ Connector Options
     <tr>
       <td><h5>scan.partition.num</h5></td>
       <td>optional</td>
+      <td>no</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
       <td>The number of partitions.</td>
@@ -165,6 +178,7 @@ Connector Options
     <tr>
       <td><h5>scan.partition.lower-bound</h5></td>
       <td>optional</td>
+      <td>no</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
       <td>The smallest value of the first partition.</td>
@@ -172,6 +186,7 @@ Connector Options
     <tr>
       <td><h5>scan.partition.upper-bound</h5></td>
       <td>optional</td>
+      <td>no</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
       <td>The largest value of the last partition.</td>
@@ -179,6 +194,7 @@ Connector Options
     <tr>
       <td><h5>scan.fetch-size</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">0</td>
       <td>Integer</td>
       <td>The number of rows that should be fetched from the database when reading per round trip. If the value specified is zero, then the hint is ignored.</td>
@@ -186,6 +202,7 @@ Connector Options
     <tr>
       <td><h5>scan.auto-commit</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>Sets the <a href="https://docs.oracle.com/javase/tutorial/jdbc/basics/transactions.html#commit_transactions">auto-commit</a> flag on the JDBC driver,
@@ -195,6 +212,7 @@ Connector Options
     <tr>
       <td><h5>lookup.cache.max-rows</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
       <td>The max number of rows of lookup cache, over this value, the oldest rows will be expired.
@@ -203,6 +221,7 @@ Connector Options
     <tr>
       <td><h5>lookup.cache.ttl</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Duration</td>
       <td>The max time to live for each rows in lookup cache, over this time, the oldest rows will be expired.
@@ -211,6 +230,7 @@ Connector Options
     <tr>
       <td><h5>lookup.cache.caching-missing-key</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>Flag to cache missing key, true by default</td>
@@ -218,6 +238,7 @@ Connector Options
     <tr>
       <td><h5>lookup.max-retries</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
       <td>The max retry times if lookup database failed.</td>
@@ -225,6 +246,7 @@ Connector Options
     <tr>
       <td><h5>sink.buffer-flush.max-rows</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">100</td>
       <td>Integer</td>
       <td>The max size of buffered records before flush. Can be set to zero to disable it.</td>
@@ -232,6 +254,7 @@ Connector Options
     <tr>
       <td><h5>sink.buffer-flush.interval</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">1s</td>
       <td>Duration</td>
       <td>The flush interval mills, over this time, asynchronous threads will flush data. Can be set to <code>'0'</code> to disable it. Note, <code>'sink.buffer-flush.max-rows'</code> can be set to <code>'0'</code> with the flush interval set allowing for complete async processing of buffered actions.</td>
@@ -239,6 +262,7 @@ Connector Options
     <tr>
       <td><h5>sink.max-retries</h5></td>
       <td>optional</td>
+      <td>yes</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
       <td>The max retry times if writing records to database failed.</td>
@@ -246,6 +270,7 @@ Connector Options
     <tr>
       <td><h5>sink.parallelism</h5></td>
       <td>optional</td>
+      <td>no</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
       <td>Defines the parallelism of the JDBC sink operator. By default, the parallelism is determined by the framework using the same parallelism of the upstream chained operator.</td>
@@ -325,39 +350,43 @@ As there is no standard syntax for upsert, the following table describes the dat
     </tbody>
 </table>
 
-### Postgres Database as a Catalog
+JDBC Catalog
+------------
 
 The `JdbcCatalog` enables users to connect Flink to relational databases over JDBC protocol.
 
-Currently, `PostgresCatalog` is the only implementation of JDBC Catalog at the moment, `PostgresCatalog` only supports limited `Catalog` methods include:
+Currently, there are two JDBC catalog implementations, Postgres Catalog and MySQL Catalog. They support the following catalog methods. Other methods are currently not supported.
 
 ```java
-// The supported methods by Postgres Catalog.
-PostgresCatalog.databaseExists(String databaseName)
-PostgresCatalog.listDatabases()
-PostgresCatalog.getDatabase(String databaseName)
-PostgresCatalog.listTables(String databaseName)
-PostgresCatalog.getTable(ObjectPath tablePath)
-PostgresCatalog.tableExists(ObjectPath tablePath)
+// The supported methods by Postgres & MySQL Catalog.
+databaseExists(String databaseName);
+listDatabases();
+getDatabase(String databaseName);
+listTables(String databaseName);
+getTable(ObjectPath tablePath);
+tableExists(ObjectPath tablePath);
 ```
 
 Other `Catalog` methods are currently not supported.
 
-#### Usage of PostgresCatalog
+### Usage of JDBC Catalog
 
-Please refer to [Dependencies](#dependencies) section for how to setup a JDBC connector and Postgres driver.
+The section mainly describes how to create and use a Postgres Catalog or MySQL Catalog.
+Please refer to [Dependencies](#dependencies) section for how to setup a JDBC connector and the corresponding driver.
 
-Postgres catalog supports the following options:
+The JDBC catalog supports the following options:
 - `name`: required, name of the catalog.
 - `default-database`: required, default database to connect to.
-- `username`: required, username of Postgres account.
+- `username`: required, username of Postgres/MySQL account.
 - `password`: required, password of the account.
-- `base-url`: required, should be of format `"jdbc:postgresql://<ip>:<port>"`, and should not contain database name here.
+- `base-url`: required (should not contain the database name)
+  - for Postgres Catalog this should be `"jdbc:postgresql://<ip>:<port>"`
+  - for MySQL Catalog this should be `"jdbc:mysql://<ip>:<port>"`
 
 {{< tabs "10bd8bfb-674c-46aa-8a36-385537df5791" >}}
 {{< tab "SQL" >}}
 ```sql
-CREATE CATALOG mypg WITH(
+CREATE CATALOG my_catalog WITH(
     'type' = 'jdbc',
     'default-database' = '...',
     'username' = '...',
@@ -365,7 +394,7 @@ CREATE CATALOG mypg WITH(
     'base-url' = '...'
 );
 
-USE CATALOG mypg;
+USE CATALOG my_catalog;
 ```
 {{< /tab >}}
 {{< tab "Java" >}}
@@ -374,17 +403,17 @@ USE CATALOG mypg;
 EnvironmentSettings settings = EnvironmentSettings.inStreamingMode();
 TableEnvironment tableEnv = TableEnvironment.create(settings);
 
-String name            = "mypg";
+String name            = "my_catalog";
 String defaultDatabase = "mydb";
 String username        = "...";
 String password        = "...";
 String baseUrl         = "..."
 
 JdbcCatalog catalog = new JdbcCatalog(name, defaultDatabase, username, password, baseUrl);
-tableEnv.registerCatalog("mypg", catalog);
+tableEnv.registerCatalog("my_catalog", catalog);
 
 // set the JdbcCatalog as the current catalog of the session
-tableEnv.useCatalog("mypg");
+tableEnv.useCatalog("my_catalog");
 ```
 {{< /tab >}}
 {{< tab "Scala" >}}
@@ -393,17 +422,17 @@ tableEnv.useCatalog("mypg");
 val settings = EnvironmentSettings.inStreamingMode()
 val tableEnv = TableEnvironment.create(settings)
 
-val name            = "mypg"
+val name            = "my_catalog"
 val defaultDatabase = "mydb"
 val username        = "..."
 val password        = "..."
 val baseUrl         = "..."
 
 val catalog = new JdbcCatalog(name, defaultDatabase, username, password, baseUrl)
-tableEnv.registerCatalog("mypg", catalog)
+tableEnv.registerCatalog("my_catalog", catalog)
 
 // set the JdbcCatalog as the current catalog of the session
-tableEnv.useCatalog("mypg")
+tableEnv.useCatalog("my_catalog")
 ```
 {{< /tab >}}
 {{< tab "Python" >}}
@@ -413,17 +442,17 @@ from pyflink.table.catalog import JdbcCatalog
 environment_settings = EnvironmentSettings.in_streaming_mode()
 t_env = TableEnvironment.create(environment_settings)
 
-name = "mypg"
+name = "my_catalog"
 default_database = "mydb"
 username = "..."
 password = "..."
 base_url = "..."
 
 catalog = JdbcCatalog(name, default_database, username, password, base_url)
-t_env.register_catalog("mypg", catalog)
+t_env.register_catalog("my_catalog", catalog)
 
 # set the JdbcCatalog as the current catalog of the session
-t_env.use_catalog("mypg")
+t_env.use_catalog("my_catalog")
 ```
 {{< /tab >}}
 {{< tab "YAML" >}}
@@ -431,11 +460,11 @@ t_env.use_catalog("mypg")
 
 execution:
     ...
-    current-catalog: mypg  # set the JdbcCatalog as the current catalog of the session
+    current-catalog: my_catalog  # set the target JdbcCatalog as the current catalog of the session
     current-database: mydb
 
 catalogs:
-   - name: mypg
+   - name: my_catalog
      type: jdbc
      default-database: mydb
      username: ...
@@ -445,12 +474,14 @@ catalogs:
 {{< /tab >}}
 {{< /tabs >}}
 
+### JDBC Catalog for PostgreSQL
+
 #### PostgreSQL Metaspace Mapping
 
 PostgreSQL has an additional namespace as `schema` besides database. A Postgres instance can have multiple databases, each database can have multiple schemas with a default one named "public", each schema can have multiple tables.
 In Flink, when querying tables registered by Postgres catalog, users can use either `schema_name.table_name` or just `table_name`. The `schema_name` is optional and defaults to "public".
 
-Therefor the metaspace mapping between Flink Catalog and Postgres is as following:
+Therefore, the metaspace mapping between Flink Catalog and Postgres is as following:
 
 | Flink Catalog Metaspace Structure    |   Postgres Metaspace Structure      |
 | :------------------------------------| :-----------------------------------|
@@ -473,6 +504,36 @@ SELECT * FROM test_table;
 SELECT * FROM mypg.mydb.`custom_schema.test_table2`
 SELECT * FROM mydb.`custom_schema.test_table2`;
 SELECT * FROM `custom_schema.test_table2`;
+```
+
+### JDBC Catalog for MySQL
+
+#### MySQL Metaspace Mapping
+
+The databases in a MySQL instance are at the same mapping level as the databases under the catalog registered with MySQL Catalog. A MySQL instance can have multiple databases, each database can have multiple tables.
+In Flink, when querying tables registered by MySQL catalog, users can use either `database.table_name` or just `table_name`. The default value is the default database specified when MySQL Catalog was created.
+
+Therefore, the metaspace mapping between Flink Catalog and MySQL Catalog is as following:
+
+| Flink Catalog Metaspace Structure    |   MySQL Metaspace Structure         |
+| :------------------------------------| :-----------------------------------|
+| catalog name (defined in Flink only) | N/A                                 |
+| database name                        | database name                       |
+| table name                           | table_name                          |
+
+The full path of MySQL table in Flink should be ``"`<catalog>`.`<db>`.`<table>`"``.
+
+Here are some examples to access MySQL tables:
+
+```sql
+-- scan table 'test_table', the default database is 'mydb'.
+SELECT * FROM mysql_catalog.mydb.test_table;
+SELECT * FROM mydb.test_table;
+SELECT * FROM test_table;
+
+-- scan table 'test_table' with the given database.
+SELECT * FROM mysql_catalog.given_database.test_table2;
+SELECT * FROM given_database.test_table2;
 ```
 
 Data Type Mapping

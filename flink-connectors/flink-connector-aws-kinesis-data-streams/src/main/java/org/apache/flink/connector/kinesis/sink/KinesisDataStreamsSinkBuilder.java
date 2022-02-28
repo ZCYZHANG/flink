@@ -18,6 +18,7 @@
 package org.apache.flink.connector.kinesis.sink;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.connector.base.sink.AsyncSinkBaseBuilder;
 
 import software.amazon.awssdk.services.kinesis.model.PutRecordsRequestEntry;
@@ -32,16 +33,12 @@ import java.util.Properties;
  * writes String values to a Kinesis Data Streams stream named your_stream_here.
  *
  * <pre>{@code
- * ElementConverter<String, PutRecordsRequestEntry> elementConverter =
- *             KinesisDataStreamsSinkElementConverter.<String>builder()
- *                     .setSerializationSchema(new SimpleStringSchema())
- *                     .setPartitionKeyGenerator(element -> String.valueOf(element.hashCode()))
- *                     .build();
- *
  * KinesisDataStreamsSink<String> kdsSink =
  *                 KinesisDataStreamsSink.<String>builder()
  *                         .setElementConverter(elementConverter)
  *                         .setStreamName("your_stream_name")
+ *                         .setSerializationSchema(new SimpleStringSchema())
+ *                         .setPartitionKeyGenerator(element -> String.valueOf(element.hashCode()))
  *                         .build();
  * }</pre>
  *
@@ -49,7 +46,7 @@ import java.util.Properties;
  *
  * <ul>
  *   <li>{@code maxBatchSize} will be 500
- *   <li>{@code maxInFlightRequests} will be 16
+ *   <li>{@code maxInFlightRequests} will be 50
  *   <li>{@code maxBufferedRequests} will be 10000
  *   <li>{@code maxBatchSizeInBytes} will be 5 MB i.e. {@code 5 * 1024 * 1024}
  *   <li>{@code maxTimeInBufferMS} will be 5000ms
@@ -65,8 +62,8 @@ public class KinesisDataStreamsSinkBuilder<InputT>
                 InputT, PutRecordsRequestEntry, KinesisDataStreamsSinkBuilder<InputT>> {
 
     private static final int DEFAULT_MAX_BATCH_SIZE = 500;
-    private static final int DEFAULT_MAX_IN_FLIGHT_REQUESTS = 16;
-    private static final int DEFAULT_MAX_BUFFERED_REQUESTS = 10000;
+    private static final int DEFAULT_MAX_IN_FLIGHT_REQUESTS = 50;
+    private static final int DEFAULT_MAX_BUFFERED_REQUESTS = 10_000;
     private static final long DEFAULT_MAX_BATCH_SIZE_IN_B = 5 * 1024 * 1024;
     private static final long DEFAULT_MAX_TIME_IN_BUFFER_MS = 5000;
     private static final long DEFAULT_MAX_RECORD_SIZE_IN_B = 1 * 1024 * 1024;
@@ -75,6 +72,8 @@ public class KinesisDataStreamsSinkBuilder<InputT>
     private Boolean failOnError;
     private String streamName;
     private Properties kinesisClientProperties;
+    private SerializationSchema<InputT> serializationSchema;
+    private PartitionKeyGenerator<InputT> partitionKeyGenerator;
 
     KinesisDataStreamsSinkBuilder() {}
 
@@ -88,6 +87,18 @@ public class KinesisDataStreamsSinkBuilder<InputT>
      */
     public KinesisDataStreamsSinkBuilder<InputT> setStreamName(String streamName) {
         this.streamName = streamName;
+        return this;
+    }
+
+    public KinesisDataStreamsSinkBuilder<InputT> setSerializationSchema(
+            SerializationSchema<InputT> serializationSchema) {
+        this.serializationSchema = serializationSchema;
+        return this;
+    }
+
+    public KinesisDataStreamsSinkBuilder<InputT> setPartitionKeyGenerator(
+            PartitionKeyGenerator<InputT> partitionKeyGenerator) {
+        this.partitionKeyGenerator = partitionKeyGenerator;
         return this;
     }
 
@@ -105,7 +116,10 @@ public class KinesisDataStreamsSinkBuilder<InputT>
     @Override
     public KinesisDataStreamsSink<InputT> build() {
         return new KinesisDataStreamsSink<>(
-                getElementConverter(),
+                new KinesisDataStreamsSinkElementConverter.Builder<InputT>()
+                        .setSerializationSchema(serializationSchema)
+                        .setPartitionKeyGenerator(partitionKeyGenerator)
+                        .build(),
                 Optional.ofNullable(getMaxBatchSize()).orElse(DEFAULT_MAX_BATCH_SIZE),
                 Optional.ofNullable(getMaxInFlightRequests())
                         .orElse(DEFAULT_MAX_IN_FLIGHT_REQUESTS),

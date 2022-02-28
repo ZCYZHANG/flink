@@ -26,8 +26,10 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.configuration.ClusterOptions;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.HeartbeatManagerOptions;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.core.execution.JobClient;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.runtime.testutils.CommonTestUtils;
@@ -81,9 +83,9 @@ public class AdaptiveSchedulerITCase extends TestLogger {
 
     private static Configuration getConfiguration() {
         final Configuration conf = new Configuration();
-
         conf.set(JobManagerOptions.SCHEDULER, JobManagerOptions.SchedulerType.Adaptive);
-
+        conf.set(HeartbeatManagerOptions.HEARTBEAT_INTERVAL, 1_000L);
+        conf.set(HeartbeatManagerOptions.HEARTBEAT_TIMEOUT, 5_000L);
         return conf;
     }
 
@@ -103,7 +105,7 @@ public class AdaptiveSchedulerITCase extends TestLogger {
 
     @After
     public void cancelRunningJobs() {
-        MINI_CLUSTER_WITH_CLIENT_RESOURCE.cancelAllJobs();
+        MINI_CLUSTER_WITH_CLIENT_RESOURCE.cancelAllJobsAndWaitUntilSlotsAreFreed();
     }
 
     /** Tests that the adaptive scheduler can recover stateful operators. */
@@ -140,7 +142,11 @@ public class AdaptiveSchedulerITCase extends TestLogger {
 
         final File savepointDirectory = tempFolder.newFolder("savepoint");
         final String savepoint =
-                client.stopWithSavepoint(false, savepointDirectory.getAbsolutePath()).get();
+                client.stopWithSavepoint(
+                                false,
+                                savepointDirectory.getAbsolutePath(),
+                                SavepointFormatType.CANONICAL)
+                        .get();
         assertThat(savepoint, containsString(savepointDirectory.getAbsolutePath()));
         assertThat(client.getJobStatus().get(), is(JobStatus.FINISHED));
     }
@@ -157,7 +163,10 @@ public class AdaptiveSchedulerITCase extends TestLogger {
 
         DummySource.awaitRunning();
         try {
-            client.stopWithSavepoint(false, tempFolder.newFolder("savepoint").getAbsolutePath())
+            client.stopWithSavepoint(
+                            false,
+                            tempFolder.newFolder("savepoint").getAbsolutePath(),
+                            SavepointFormatType.CANONICAL)
                     .get();
             fail("Expect exception");
         } catch (ExecutionException e) {
@@ -181,7 +190,10 @@ public class AdaptiveSchedulerITCase extends TestLogger {
 
         DummySource.awaitRunning();
         try {
-            client.stopWithSavepoint(false, tempFolder.newFolder("savepoint").getAbsolutePath())
+            client.stopWithSavepoint(
+                            false,
+                            tempFolder.newFolder("savepoint").getAbsolutePath(),
+                            SavepointFormatType.CANONICAL)
                     .get();
             fail("Expect exception");
         } catch (ExecutionException e) {
@@ -210,7 +222,11 @@ public class AdaptiveSchedulerITCase extends TestLogger {
         DummySource.resetForParallelism(PARALLELISM);
         final File savepointDirectory = tempFolder.newFolder("savepoint");
         try {
-            client.stopWithSavepoint(false, savepointDirectory.getAbsolutePath()).get();
+            client.stopWithSavepoint(
+                            false,
+                            savepointDirectory.getAbsolutePath(),
+                            SavepointFormatType.CANONICAL)
+                    .get();
             fail("Expect failure of operation");
         } catch (ExecutionException e) {
             assertThat(e, containsCause(FlinkException.class));
@@ -227,7 +243,11 @@ public class AdaptiveSchedulerITCase extends TestLogger {
 
         // trigger second savepoint
         final String savepoint =
-                client.stopWithSavepoint(false, savepointDirectory.getAbsolutePath()).get();
+                client.stopWithSavepoint(
+                                false,
+                                savepointDirectory.getAbsolutePath(),
+                                SavepointFormatType.CANONICAL)
+                        .get();
         assertThat(savepoint, containsString(savepointDirectory.getAbsolutePath()));
     }
 

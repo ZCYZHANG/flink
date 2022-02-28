@@ -130,7 +130,11 @@ public class NettyShuffleServiceFactory
         ConnectionManager connectionManager =
                 nettyConfig != null
                         ? new NettyConnectionManager(
-                                resultPartitionManager, taskEventPublisher, nettyConfig)
+                                resultPartitionManager,
+                                taskEventPublisher,
+                                nettyConfig,
+                                config.getMaxNumberOfConnections(),
+                                config.isConnectionReuseEnabled())
                         : new LocalConnectionManager();
 
         NetworkBufferPool networkBufferPool =
